@@ -13,9 +13,10 @@ export default function MovieDetail({ idioma, t }) {
   const [loading, setLoading] = useState(true);
   const [modalImagen, setModalImagen] = useState(null);
 
-  // --- ESTADOS PARA EL BACKEND (Bóveda) ---
-  const [agregando, setAgregando] = useState(false);
-  const [mensajeBoveda, setMensajeBoveda] = useState('');
+  const user = JSON.parse(localStorage.getItem('usuario'));
+  const [estado, setEstado] = useState({ en_boveda: false, visto: false, puntuacion: null });
+  const [procesando, setProcesando] = useState(false);
+  const [hoverStar, setHoverStar] = useState(0); // <-- Nuevo estado para el efecto visual de las estrellas
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -45,53 +46,77 @@ export default function MovieDetail({ idioma, t }) {
         dataTextos.poster_path = dataImagenes.poster_path || dataTextos.poster_path;
         dataTextos.backdrop_path = dataImagenes.backdrop_path || dataTextos.backdrop_path;
         dataTextos.all_images = dataImagenes.images;
-
         dataTextos.providers = dataTextos['watch/providers']?.results?.[region]?.flatrate || [];
         dataTextos.watch_link = dataTextos['watch/providers']?.results?.[region]?.link;
         dataTextos.director = dataTextos.credits?.crew?.find(persona => persona.job === 'Director')?.name;
 
         setPeli(dataTextos);
-        setLoading(false);
       } catch (error) {
         console.error("Error:", error);
-        setLoading(false); 
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const fetchBovedaStatus = async () => {
+      if (user && id) {
+        try {
+          const res = await fetch(`http://127.0.0.1:8000/api/boveda/status/${user.id}/${id}`);
+          const data = await res.json();
+          setEstado(data);
+        } catch (error) {
+          console.error("Error consultando bóveda:", error);
+        }
       }
     };
 
     fetchDetail();
+    fetchBovedaStatus();
   }, [id, idioma]);
 
-  // --- FUNCIÓN PARA AGREGAR A LA BÓVEDA (Habla con FastAPI) ---
-  const agregarABoveda = async () => {
-    const userJson = localStorage.getItem('usuario');
-    if (!userJson) {
-      setMensajeBoveda("Inicia sesión");
-      return;
-    }
-    
-    const user = JSON.parse(userJson);
-    setAgregando(true);
+  const updateBackend = async (newEstado) => {
+    if (!user) return;
+    setProcesando(true);
+    setEstado(newEstado); 
 
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/boveda/add', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id_usuario: Number(user.id),
-          id_pelicula: Number(id)
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail);
-
-      setMensajeBoveda("¡Guardada!");
+      if (!newEstado.en_boveda) {
+        await fetch(`http://127.0.0.1:8000/api/boveda/remove/${user.id}/${id}`, { method: 'DELETE' });
+      } else {
+        await fetch(`http://127.0.0.1:8000/api/boveda/update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            id_usuario: Number(user.id),
+            id_pelicula: Number(id),
+            visto: newEstado.visto,
+            puntuacion: newEstado.puntuacion ? Number(newEstado.puntuacion) : null
+          })
+        });
+      }
     } catch (err) {
-      setMensajeBoveda(err.message === "La película ya está en tu bóveda" ? "Ya la tienes" : "Error");
+      console.error("Error guardando:", err);
     } finally {
-      setAgregando(false);
-      setTimeout(() => setMensajeBoveda(''), 3000);
+      setProcesando(false);
     }
+  };
+
+  const toggleBoveda = () => {
+    const isNowInVault = !estado.en_boveda;
+    updateBackend({
+      ...estado,
+      en_boveda: isNowInVault,
+      visto: isNowInVault ? estado.visto : false,
+      puntuacion: isNowInVault ? estado.puntuacion : null
+    });
+  };
+
+  const toggleVisto = () => updateBackend({ ...estado, visto: !estado.visto });
+  
+  // Modificamos la función para recibir el valor numérico de la estrella tocada
+  // Si le damos una nota, asumimos automáticamente que la película fue vista
+  const handlePuntuacion = (val) => {
+    updateBackend({ ...estado, puntuacion: val, visto: true });
   };
 
   if (loading || !peli) return (
@@ -108,7 +133,6 @@ export default function MovieDetail({ idioma, t }) {
 
   return (
     <div className="min-h-screen bg-cine-bg pb-24 relative">
-      
       {modalImagen && (
         <div className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center p-4 cursor-pointer" onClick={() => setModalImagen(null)}>
           <img src={modalImagen} alt="Ampliada" className="max-w-full max-h-[90vh] object-contain rounded-xl shadow-2xl" />
@@ -134,24 +158,80 @@ export default function MovieDetail({ idioma, t }) {
           </div>
 
           <div className="lg:col-span-9 mt-4 lg:mt-12">
-            <div className="flex flex-col md:flex-row md:items-center gap-6 mb-2">
-              <h1 className="text-5xl lg:text-7xl font-black text-white uppercase italic leading-none tracking-tighter shadow-black drop-shadow-md">
-                {peli.original_title}
-              </h1>
+            <h1 className="text-5xl lg:text-7xl font-black text-white uppercase italic leading-none tracking-tighter shadow-black drop-shadow-md mb-6">
+              {peli.original_title}
+            </h1>
               
-              {/* --- EL BOTÓN DE BÓVEDA INTEGRADO AQUÍ --- */}
-              <button 
-                onClick={agregarABoveda}
-                disabled={agregando}
-                className={`flex items-center gap-2 px-6 py-3 rounded-full font-black uppercase text-[10px] tracking-widest transition-all shadow-xl ${
-                  mensajeBoveda 
-                    ? (mensajeBoveda === "¡Guardada!" ? 'bg-green-600' : 'bg-orange-600') 
-                    : 'bg-cine-accent hover:bg-cine-accent-hover hover:scale-105 active:scale-95 shadow-cine-accent/20'
-                }`}
-              >
-                <span>{mensajeBoveda === "¡Guardada!" ? '✓' : (agregando ? '...' : '+')}</span>
-                {mensajeBoveda || (agregando ? '...' : 'Añadir a Bóveda')}
-              </button>
+            {/* PANEL DE CONTROL ESTÉTICO */}
+            <div className="mb-8">
+              {user ? (
+                <div className="flex flex-wrap items-center gap-4 bg-black/50 p-2 rounded-2xl border border-white/10 backdrop-blur-md shadow-xl w-fit">
+                  
+                  <button 
+                    onClick={toggleBoveda} disabled={procesando}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${
+                      estado.en_boveda 
+                        ? 'bg-cine-accent text-white shadow-lg shadow-cine-accent/20' 
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    <span className="text-lg leading-none">{estado.en_boveda ? '✓' : '+'}</span>
+                    {estado.en_boveda ? 'En Bóveda' : 'Añadir a Bóveda'}
+                  </button>
+
+                  {estado.en_boveda && (
+                    <>
+                      <div className="w-px h-6 bg-white/10 hidden sm:block"></div>
+                      
+                      <button 
+                        onClick={toggleVisto} disabled={procesando}
+                        className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all ${
+                          estado.visto 
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                            : 'bg-white/5 text-gray-400 border border-transparent hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        <span className="text-lg leading-none">👁</span>
+                        {estado.visto ? 'Vista' : 'Marcar Vista'}
+                      </button>
+
+                      <div className="w-px h-6 bg-white/10 hidden sm:block"></div>
+
+                      {/* SISTEMA DE ESTRELLAS INTERACTIVO */}
+                      <div className="flex items-center px-4 py-2 bg-white/5 rounded-xl border border-transparent">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 mr-3">
+                          {estado.puntuacion ? `Tu Nota: ${estado.puntuacion}/10` : 'Calificar:'}
+                        </span>
+                        
+                        <div className="flex items-center gap-0.5" onMouseLeave={() => setHoverStar(0)}>
+                          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((starValue) => {
+                            const isFilled = starValue <= (hoverStar || estado.puntuacion || 0);
+                            return (
+                              <button
+                                key={starValue}
+                                disabled={procesando}
+                                onMouseEnter={() => setHoverStar(starValue)}
+                                onClick={() => handlePuntuacion(starValue)}
+                                className={`text-xl transition-all duration-200 focus:outline-none ${
+                                  isFilled 
+                                    ? 'text-cine-accent scale-110 drop-shadow-[0_0_8px_rgba(220,38,38,0.8)]' 
+                                    : 'text-gray-600 hover:text-gray-400 hover:scale-110'
+                                }`}
+                              >
+                                ★
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <span className="inline-block text-xs text-gray-500 font-bold uppercase tracking-widest bg-black/40 px-6 py-3 rounded-full border border-white/5">
+                  Inicia sesión para crear listas y calificar
+                </span>
+              )}
             </div>
             
             <p className="text-gray-400 font-bold uppercase tracking-widest text-sm mb-6">
@@ -200,7 +280,6 @@ export default function MovieDetail({ idioma, t }) {
           </div>
         </div>
 
-        {/* REPARTO */}
         <section className="mb-20 max-w-7xl">
           <h3 className="text-2xl font-black text-white uppercase italic border-b border-white/10 pb-3 mb-6">{textos.elenco}</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-4">
@@ -216,7 +295,6 @@ export default function MovieDetail({ idioma, t }) {
           </div>
         </section>
 
-        {/* GALERÍA VISUAL */}
         {peli.all_images?.backdrops?.length > 0 && (
           <section className="mb-20 max-w-7xl">
             <h3 className="text-2xl font-black text-white uppercase italic border-b border-white/10 pb-3 mb-6">{textos.galeria}</h3>
@@ -230,7 +308,6 @@ export default function MovieDetail({ idioma, t }) {
           </section>
         )}
 
-        {/* RESEÑAS */}
         <section className="max-w-7xl">
           <h3 className="text-2xl font-black text-white uppercase italic border-b border-white/10 pb-3 mb-6">{textos.resenas}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

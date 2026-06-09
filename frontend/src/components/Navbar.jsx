@@ -28,6 +28,11 @@ export default function Navbar({ idioma, setIdioma, t }) {
         {usuario && (
           <Link to="/boveda" className="text-white hover:text-cine-accent transition-colors">Mi Bóveda</Link>
         )}
+
+        {usuario && (
+          // En tu Navbar.jsx dentro del menú de navegación:
+          <Link to="/comunidad" className="text-gray-400 hover:text-white font-bold uppercase text-xs tracking-widest transition-colors">Comunidad</Link>
+        )}
         
         <div className="flex bg-black/50 border border-white/20 rounded-full overflow-hidden ml-4">
           <button onClick={() => setIdioma('es')} className={`px-4 py-2 transition-colors ${idioma === 'es' ? 'bg-cine-accent text-white' : 'text-gray-400 hover:text-white'}`}>ESP</button>

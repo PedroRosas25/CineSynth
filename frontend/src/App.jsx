@@ -8,6 +8,7 @@ import Registro from './pages/Registro';
 import Boveda from './pages/Boveda';
 import Catalogo from './pages/Catalogo';
 import MovieDetail from './pages/MovieDetail';
+import Comunidad from './pages/Comunidad';
 
 function App() {
   const [idioma, setIdioma] = useState('es');
@@ -25,6 +26,8 @@ function App() {
           <Route path="/registro" element={<Registro />} />
           <Route path="/boveda" element={<Boveda />} />
           <Route path="/catalogo" element={<Catalogo idioma={idioma} t={t} />} />
+          <Route path="/boveda/:id_amigo" element={<Boveda idioma={idioma} />} />
+          <Route path="/comunidad" element={<Comunidad />} />
           
           {/* NUEVA RUTA DINÁMICA PARA EL DETALLE DE LA PELÍCULA */}
           <Route path="/pelicula/:id" element={<MovieDetail idioma={idioma} t={t} />} />
