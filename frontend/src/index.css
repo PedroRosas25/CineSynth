@@ -1,10 +1,20 @@
+/* archivo de estilos globales de la app
+  aca importo la tipografia que uso en toda la pagina y cargo las bases de Tailwind CSS 
+  para que me funcionen todas las clases que voy poniendo en los componentes.
+*/
+
+/* importo la tipografia Inter desde Google Fonts con los distintos grosores*/
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&display=swap');
 
+/* cargo las capas principales de Tailwind (bases, componentes y utilidades) para que el framework arranque */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* aca inyecto estilos directamente en la capa base de Tailwind para configurar el fondo general */
 @layer base {
+  /* le digo al body que use nuestro color oscuro por defecto (bg-cine-bg), 
+     un texto gris clarito y suavizado de fuentes (antialiased) para que se vea mas moderno */
   body {
     @apply bg-cine-bg text-gray-200 antialiased;
   }
