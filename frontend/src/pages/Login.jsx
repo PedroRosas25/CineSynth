@@ -5,11 +5,12 @@
 */
 
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import AuthBackground from '../components/AuthBackground';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   
   // armo mis estados para guardar lo que escribe el usuario si quiere ver la clave los errores y la carga
   const [formData, setFormData] = useState({ email: '', password: '' });
@@ -42,8 +43,32 @@ export default function Login() {
       // si paso todo bien guardo al usuario en el almacenamiento local
       localStorage.setItem('usuario', JSON.stringify(data.usuario));
       
-      // le paso un -1 al navigate para decirle al navegador que retroceda un paso en el historial
-      navigate(-1);
+      // leo el indice del historial de navegacion para saber cuantas paginas previas hay de forma segura
+      const historyIndex = window.history.state ? window.history.state.idx : 0;
+      
+      // si viene del registro lo mandamos a la pagina inicial
+      if (location.state && location.state.vieneDeRegistro) {
+        navigate('/', { replace: true });
+      } 
+      // si toco el enlace de "ya tengo cuenta" en el registro aplico el salto doble
+      else if (location.state && location.state.desdeEnlaceRegistro) {
+        // si hay historial suficiente para volver dos pasos, los vuelve
+        if (historyIndex > 1) {
+          navigate(-2);
+        } else {
+          // si no hay historial, lo tira a la raiz por seguridad
+          navigate('/', { replace: true });
+        }
+      } 
+      // flujo normal del login retrocede un paso
+      else {
+        // me aseguro de que haya por lo menos un paso para retroceder
+        if (historyIndex > 0) {
+          navigate(-1);
+        } else {
+          navigate('/', { replace: true });
+        }
+      }
     } catch (err) {
       // si atrape algun error lo guardo en el estado para mostrarlo en pantalla
       setError(err.message);

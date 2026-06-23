@@ -71,8 +71,8 @@ export default function Registro() {
       // si el servidor me rechaza tiro el error para atajarlo abajo
       if (!response.ok) throw new Error(data.detail || 'Error al registrarse');
 
-      // si salio todo perfecto lo mando directo a la pantalla de login para que entre
-      navigate('/login');
+      // si salio todo perfecto lo mando directo a la pantalla de login pasando el estado oculto
+      navigate('/login', { state: { vieneDeRegistro: true } });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -204,7 +204,7 @@ export default function Registro() {
         </form>
 
         <p className="text-gray-500 text-xs text-center mt-8 font-medium">
-          ¿Ya tenes cuenta? <Link to="/login" className="text-white hover:text-cine-accent font-black transition-colors">Ingresa aca</Link>
+          ¿Ya tenes cuenta? <Link to="/login" state={{ desdeEnlaceRegistro: true }} className="text-white hover:text-cine-accent font-black transition-colors">Ingresa aca</Link>
         </p>
       </div>
       
